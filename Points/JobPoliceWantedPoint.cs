@@ -156,10 +156,10 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
     #region CUSTOM
     public void JobPoliceWantedPanel(Player player)
     {
-        Panel panel = Context.PanelHelper.Create("Avis de recherches", UIPanel.PanelType.Tab, player, () => JobPoliceWantedPanel(player));
+        Panel panel = Context.PanelHelper.Create("Centrale", UIPanel.PanelType.Tab, player, () => JobPoliceWantedPanel(player));
 
-        panel.AddTabLine("Véhicules ", ui => JobPoliceVehicleWantedPanel(player));
-        panel.AddTabLine("Citoyens", ui => JobPoliceCitizenWantedPanel(player));
+        panel.AddTabLine("Véhicules recherchés", ui => JobPoliceVehicleWantedPanel(player));
+        panel.AddTabLine("Citoyens enregistrés", ui => JobPoliceCitizenWantedPanel(player));
 
         panel.NextButton("Sélectionner", () => panel.SelectTab());
         panel.PreviousButton();
@@ -168,6 +168,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         panel.Display();
     }
 
+    #region VEHICLES
     public async void JobPoliceVehicleWantedPanel(Player player)
     {
         var query = await JobPoliceVehicle.QueryAll();
@@ -197,7 +198,6 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         panel.Display();
     }
-
     public async void JobPoliceShowVehicleWantedPanel(Player player, int jobPoliceVehicleId)
     {
         var query = await JobPoliceVehicle.Query(v => v.Id == jobPoliceVehicleId);
@@ -223,7 +223,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
                 return true;
             } else
             {
-                player.Notify("Erreur", "Nous n'avons pas pu retirer ce véhicule", NotificationManager.Type.Success);
+                player.Notify("Erreur", "Nous n'avons pas pu retirer ce véhicule", NotificationManager.Type.Error);
                 return false;
             }
         });
@@ -232,7 +232,6 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         panel.Display();
     }
-
     public async void JobPoliceAddVehicleWantedPanel(Player player, int jobPoliceVehicleId)
     {
         var query = await JobPoliceVehicle.Query(v => v.Id == jobPoliceVehicleId);
@@ -263,8 +262,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
             {
                 player.Notify("Erreur", "Fiche du véhicule recherché incomplet", NotificationManager.Type.Error);
                 return await Task.FromResult(false);
-            }
-            
+            }           
         });
 
         panel.PreviousButton();
@@ -301,7 +299,6 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         panel.Display();
     }
-
     public void JobPoliceVehicleSetReason(Player player, JobPoliceVehicle vehicle)
     {
         Panel panel = Context.PanelHelper.Create("Définir le motif de la recherche", UIPanel.PanelType.Input, player, () => JobPoliceVehicleSetReason(player, vehicle));
@@ -329,7 +326,6 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         panel.Display();
     }
-
     public void JobPoliceVehicleSetModel(Player player, JobPoliceVehicle vehicle)
     {
         Panel panel = Context.PanelHelper.Create("Sélectionner le modèle du véhicule recherché", UIPanel.PanelType.TabPrice, player, () => JobPoliceVehicleSetModel(player, vehicle));
@@ -355,6 +351,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         panel.Display();
     }
     #endregion
+    #endregion
 
     public async void JobPoliceCitizenWantedPanel(Player player)
     {
@@ -366,35 +363,161 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         {
             foreach (var c in query)
             {
-                panel.AddTabLine($"{c.Firstname} {c.Lastname} {mk.Color($"{DateUtils.ConvertNumericalDateToString(c.CreatedAt)}",$"{mk.Colors.Warning}")}", _ => { });
+                panel.AddTabLine($"{c.Pseudonym}", ui => { });
             }
             panel.NextButton("Consulter", () => panel.SelectTab());
         }
         else panel.AddTabLine("Aucun", _ => { });
 
-
+        panel.NextButton("Ajouter", async () =>
+        {
+            var newCitizen = new JobPoliceCitizen();
+            newCitizen.CreatedAt = DateUtils.GetNumericalDateOfTheDay();
+            await newCitizen.Save();
+            JobPoliceAddCitizenWantedPanel(player, newCitizen.Id);
+        });
         panel.PreviousButton();
         panel.CloseButton();
 
         panel.Display();
     }
 
-    public void JobPoliceAddCitizenWantedPanel(Player player)
+    public async void JobPoliceShowCitizenWantedPanel(Player player, int jobPoliceCitizenId)
     {
-        var newVehicle = new JobPoliceVehicle();
+        var query = await JobPoliceCitizen.Query(v => v.Id == jobPoliceCitizenId);
+        var citizen = query?[0];
 
-        Panel panel = Context.PanelHelper.Create("Ajouter un citoyen recherché", UIPanel.PanelType.Input, player, () => JobPoliceAddCitizenWantedPanel(player));
+        Panel panel = Context.PanelHelper.Create($"Détails du citoyen enregistré", UIPanel.PanelType.Tab, player, () => JobPoliceShowCitizenWantedPanel(player, jobPoliceCitizenId));
 
-        panel.TextLines.Add("Renseigner la plaque du véhicule");
-
-        panel.NextButton("Continuer", () =>
+        panel.AddTabLine($"{mk.Color("Empreintes digitales:", mk.Colors.Info)} {(citizen.CharacterId != default ? $"[{citizen.CharacterId}]" : $"{mk.Italic("inconnu")}")}", async ui =>
         {
-            if (panel.inputText.Length > 0)
+            var target = player.GetClosestPlayer();
+            if (target != null)
             {
-                newVehicle.CreatedAt = DateUtils.GetNumericalDateOfTheDay();
-                newVehicle.Plate = panel.inputText;
+                citizen.CharacterId = target.character.Id;
+                if (await citizen.Save()) panel.Refresh();
+                else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
             }
-            else player.Notify("Erreur", "Vous devez renseigner la plaque d'immatriculation", NotificationManager.Type.Error);
+            else
+            {
+                player.Notify("Condition", "Le citoyen dont vous souhaitez relever les empreintes doit être à votre proximité", NotificationManager.Type.Info);
+                panel.Refresh();
+            }
+        });
+        panel.AddTabLine($"{mk.Color("Pseudonym:", mk.Colors.Info)} {(citizen.Pseudonym != null ? $"{citizen.Pseudonym}" : $"{mk.Italic("à définir")}")}", ui => JobPoliceCitizenSetPseudonym(player, citizen));
+        panel.AddTabLine($"{mk.Color("Nom:", mk.Colors.Info)} {(citizen.Lastname != null ? $"{citizen.Lastname}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetLastname(player, citizen));
+        panel.AddTabLine($"{mk.Color("Prénom:", mk.Colors.Info)} {(citizen.Firstname != null ? $"{citizen.Firstname}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetFirstname(player, citizen));
+        panel.AddTabLine($"{mk.Color("Téléphone:", mk.Colors.Info)} {(citizen.PhoneNumber != null ? $"{citizen.PhoneNumber}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetPhoneNumber(player, citizen));
+        panel.AddTabLine($"{mk.Color("Sexe:", mk.Colors.Info)} {(citizen.Sexe != null ? $"{citizen.Sexe}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSexe(player, citizen));
+        panel.AddTabLine($"{mk.Color("Couleur des yeux:", mk.Colors.Info)} {(citizen.EyesColor != default ? $"{citizen.EyesColor}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetEyesColor(player, citizen));
+        panel.AddTabLine($"{mk.Color("Couleur de peau:", mk.Colors.Info)} {(citizen.SkinColor != null ? $"{citizen.SkinColor}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSkinColor(player, citizen));
+        panel.AddTabLine($"{mk.Color("Recherché:", mk.Colors.Info)} {(citizen.Wanted ? "oui" : "non")}", async ui => {
+            citizen.Wanted = !citizen.Wanted;
+            if (await citizen.Save()) panel.Refresh();
+            else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
+        });
+        panel.AddTabLine($"{mk.Color("Fichier S:", mk.Colors.Info)} {(citizen.Dangerous ? "oui" : "non")}", async ui => {
+            citizen.Dangerous = !citizen.Dangerous;
+            if (await citizen.Save()) panel.Refresh();
+            else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
+        });
+        panel.AddTabLine($"{mk.Color("Ajouté le:", mk.Colors.Info)} {DateUtils.ConvertNumericalDateToString(citizen.CreatedAt)}", ui =>
+        {
+            player.Notify("Erreur", "Vous ne pouvez pas modifier la date de création", NotificationManager.Type.Error);
+            panel.Refresh();
+        });
+
+        panel.NextButton("Casier judiciaire", () => { });
+        panel.NextButton("Modifier", () => panel.SelectTab());
+        panel.PreviousButtonWithAction("Supprimer", async () =>
+        {
+            if(player.biz.OwnerId == player.character.Id)
+            {
+                if (await citizen.Delete())
+                {
+                    player.Notify("Succès", "Ce citoyen n'est plus référencé", NotificationManager.Type.Success);
+                    return true;
+                }
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu retirer ce citoyen", NotificationManager.Type.Error);
+                    return false;
+                }
+            }
+
+            else
+            {
+                player.Notify("Erreur", "Vous n'avez pas l'autorisation de détruire ce document", NotificationManager.Type.Error);
+                return false;
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+
+    public async void JobPoliceAddCitizenWantedPanel(Player player, int jobPoliceCitizenId)
+    {
+        var query = await JobPoliceCitizen.Query(v => v.Id == jobPoliceCitizenId);
+        var citizen = query?[0];
+
+        Panel panel = Context.PanelHelper.Create("Ajouter un citoyen", UIPanel.PanelType.Tab, player, () => JobPoliceAddCitizenWantedPanel(player, jobPoliceCitizenId));
+
+        panel.AddTabLine($"{mk.Color("Empreintes digitales:", mk.Colors.Info)} {(citizen.CharacterId != default ? $"[{citizen.CharacterId}]": $"{mk.Italic("inconnu")}")}", async ui =>
+        {
+            var target = player.GetClosestPlayer();
+            if(target != null)
+            {
+                citizen.CharacterId = target.character.Id;
+                if (await citizen.Save()) panel.Refresh();
+                else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
+            }
+            else
+            {
+                player.Notify("Condition", "Le citoyen dont vous souhaitez relever les empreintes doit être à votre proximité", NotificationManager.Type.Info);
+                panel.Refresh();
+            }
+        });
+        panel.AddTabLine($"{mk.Color("Pseudonym:", mk.Colors.Info)} {(citizen.Pseudonym != null ? $"{citizen.Pseudonym}": $"{mk.Italic("à définir")}")}", ui => JobPoliceCitizenSetPseudonym(player, citizen));
+        panel.AddTabLine($"{mk.Color("Nom:", mk.Colors.Info)} {(citizen.Lastname != null ? $"{citizen.Lastname}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetLastname(player, citizen));
+        panel.AddTabLine($"{mk.Color("Prénom:", mk.Colors.Info)} {(citizen.Firstname != null ? $"{citizen.Firstname}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetFirstname(player, citizen));
+        panel.AddTabLine($"{mk.Color("Téléphone:", mk.Colors.Info)} {(citizen.PhoneNumber != null ? $"{citizen.PhoneNumber}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetPhoneNumber(player, citizen));
+        panel.AddTabLine($"{mk.Color("Sexe:", mk.Colors.Info)} {(citizen.Sexe != null ? $"{citizen.Sexe}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSexe(player, citizen));
+        panel.AddTabLine($"{mk.Color("Couleur des yeux:", mk.Colors.Info)} {(citizen.EyesColor != default ? $"{citizen.EyesColor}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetEyesColor(player, citizen));
+        panel.AddTabLine($"{mk.Color("Couleur de peau:", mk.Colors.Info)} {(citizen.SkinColor != null ? $"{citizen.SkinColor}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSkinColor(player, citizen));
+        panel.AddTabLine($"{mk.Color("Recherché:", mk.Colors.Info)} {(citizen.Wanted ? "oui":"non")}", async ui => {
+            citizen.Wanted = !citizen.Wanted;
+            if (await citizen.Save()) panel.Refresh();
+            else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
+        });
+        panel.AddTabLine($"{mk.Color("Fichier S:", mk.Colors.Info)} {(citizen.Dangerous ? "oui":"non")}", async ui => {
+            citizen.Dangerous = !citizen.Dangerous;
+            if (await citizen.Save()) panel.Refresh();
+            else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
+        });
+
+        panel.NextButton("Modifier", () => panel.SelectTab());
+        panel.PreviousButtonWithAction("Enregistrer", async () =>
+        {
+            if (citizen.Pseudonym != null)
+            {
+                if (await citizen.Save())
+                {
+                    player.Notify("Succès", "Citoyen enregistré !", NotificationManager.Type.Success);
+                    return await Task.FromResult(true);
+                }
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu enregistrer ce citoyen", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Fiche du citoyen incomplet. Veuillez renseigner au minimum le pseudonyme.", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
         });
 
         panel.PreviousButton();
@@ -402,6 +525,198 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         panel.Display();
     }
+
+    #region citizen setters
+    public void JobPoliceCitizenSetPseudonym(Player player, JobPoliceCitizen citizen)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le pseudonyme", UIPanel.PanelType.Input, player, () => JobPoliceCitizenSetPseudonym(player, citizen));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                citizen.Pseudonym = panel.inputText;
+                if (await citizen.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir une valeur", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceCitizenSetFirstname(Player player, JobPoliceCitizen citizen)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le prénom", UIPanel.PanelType.Input, player, () => JobPoliceCitizenSetFirstname(player, citizen));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                citizen.Firstname = panel.inputText;
+                if (await citizen.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir une valeur", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceCitizenSetLastname(Player player, JobPoliceCitizen citizen)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le nom", UIPanel.PanelType.Input, player, () => JobPoliceCitizenSetLastname(player, citizen));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                citizen.Lastname = panel.inputText;
+                if (await citizen.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir une valeur", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceCitizenSetPhoneNumber(Player player, JobPoliceCitizen citizen)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le numéro de téléphone", UIPanel.PanelType.Input, player, () => JobPoliceCitizenSetPhoneNumber(player, citizen));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                citizen.PhoneNumber = panel.inputText;
+                if (await citizen.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir une valeur", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceCitizenSetSexe(Player player, JobPoliceCitizen citizen)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le sexe", UIPanel.PanelType.Input, player, () => JobPoliceCitizenSetSexe(player, citizen));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                citizen.Sexe = panel.inputText;
+                if (await citizen.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir une valeur", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceCitizenSetSkinColor(Player player, JobPoliceCitizen citizen)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir la couleur de peau", UIPanel.PanelType.Input, player, () => JobPoliceCitizenSetSkinColor(player, citizen));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                citizen.SkinColor = panel.inputText;
+                if (await citizen.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir une valeur", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceCitizenSetEyesColor(Player player, JobPoliceCitizen citizen)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir la couleur des yeux", UIPanel.PanelType.Input, player, () => JobPoliceCitizenSetEyesColor(player, citizen));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                citizen.EyesColor = panel.inputText;
+                if (await citizen.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir une valeur", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    #endregion
     #endregion
 
     #region REPLACE YOUR CLASS/TYPE AS PARAMETER
