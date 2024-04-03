@@ -59,8 +59,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Entities\JobPoliceCitizen.cs" />
+    <Compile Include="Entities\JobPoliceVehicle.cs" />
     <Compile Include="JobPolice.cs" />
+    <Compile Include="Points\JobPoliceWantedPoint.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
