@@ -10,6 +10,7 @@ using System.Linq;
 using JobPolice.Entities;
 using ModKit.Utils;
 using Life;
+using Life.VehicleSystem;
 public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, PatternData
 {
     [AutoIncrement][PrimaryKey] public int Id { get; set; }
@@ -177,7 +178,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         {
             foreach(var v in query)
             {
-                panel.AddTabLine($"{v.Plate}", $"{DateUtils.ConvertNumericalDateToString(v.CreatedAt)}", VehicleUtils.getIconId(v.ModelId), ui => JobPoliceShowVehicleWantedPanel(player, v));
+                panel.AddTabLine($"{v.Plate}", $"{DateUtils.ConvertNumericalDateToString(v.CreatedAt)}", VehicleUtils.getIconId(v.ModelId), ui => JobPoliceShowVehicleWantedPanel(player, v.Id));
             }
 
             panel.NextButton("Consulter", () => panel.SelectTab());
@@ -187,6 +188,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         panel.NextButton("Ajouter", async () =>
         {
             var newVehicle = new JobPoliceVehicle();
+            newVehicle.CreatedAt = DateUtils.GetNumericalDateOfTheDay();
             await newVehicle.Save();
             JobPoliceAddVehicleWantedPanel(player, newVehicle.Id);
         });
@@ -196,16 +198,23 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         panel.Display();
     }
 
-    public void JobPoliceShowVehicleWantedPanel(Player player, JobPoliceVehicle vehicle)
+    public async void JobPoliceShowVehicleWantedPanel(Player player, int jobPoliceVehicleId)
     {
-        Panel panel = Context.PanelHelper.Create($"Véhicule {vehicle.Plate}", UIPanel.PanelType.Tab, player, () => JobPoliceShowVehicleWantedPanel(player, vehicle));
+        var query = await JobPoliceVehicle.Query(v => v.Id == jobPoliceVehicleId);
+        var vehicle = query?[0];
 
-        panel.AddTabLine($"Nom du modèle: {VehicleUtils.getModelNameByModelId(vehicle.ModelId)}", _ => { });
-        panel.AddTabLine($"Plaque: {vehicle.Plate}", _ => { });
-        panel.AddTabLine($"Motif: {vehicle.Reason}", _ => { });
-        panel.AddTabLine($"Créée le: {DateUtils.ConvertNumericalDateToString(vehicle.CreatedAt)}", _ => { });
+        Panel panel = Context.PanelHelper.Create($"Détails du véhicule recherché", UIPanel.PanelType.Tab, player, () => JobPoliceShowVehicleWantedPanel(player, jobPoliceVehicleId));
 
-        //button modifier
+        panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {VehicleUtils.getModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
+        panel.AddTabLine($"{mk.Color("Plaque:", mk.Colors.Info)} {vehicle.Plate}", ui => JobPoliceVehicleSetPlate(player, vehicle));
+        panel.AddTabLine($"{mk.Color("Motif", mk.Colors.Info)} {vehicle.Reason}", ui => JobPoliceVehicleSetReason(player, vehicle));
+        panel.AddTabLine($"{mk.Color("Recherché depuis le:", mk.Colors.Info)} {DateUtils.ConvertNumericalDateToString(vehicle.CreatedAt)}", ui =>
+        {
+            player.Notify("Erreur", "Vous ne pouvez pas modifier la date de création", NotificationManager.Type.Error);
+            panel.Refresh();
+        });
+
+        panel.NextButton("Modifier", () => panel.SelectTab());
         panel.PreviousButtonWithAction("Supprimer", async () =>
         {
             if(await vehicle.Delete())
@@ -231,16 +240,15 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         Panel panel = Context.PanelHelper.Create("Ajouter un véhicule recherché", UIPanel.PanelType.Tab, player, () => JobPoliceAddVehicleWantedPanel(player, jobPoliceVehicleId));
 
-        panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {(vehicle?.ModelId != default ? VehicleUtils.getModelNameByModelId(vehicle.ModelId) : ". . .")}", ui => JobPoliceVehicleSetModel(player, vehicle));
+        panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {VehicleUtils.getModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
         panel.AddTabLine($"{mk.Color("Plaque:", mk.Colors.Info)} {(vehicle?.Plate != null ? vehicle.Plate : ". . .")}", ui => JobPoliceVehicleSetPlate(player, vehicle));
         panel.AddTabLine($"{mk.Color("Motif: ", mk.Colors.Info)} {(vehicle?.Reason != null ? vehicle.Reason : ". . .")}", ui => JobPoliceVehicleSetReason(player, vehicle));
 
         panel.NextButton("Modifier", () => panel.SelectTab());
         panel.PreviousButtonWithAction("Enregistrer", async () =>
         {
-            if(vehicle.ModelId != default && vehicle.Plate != null && vehicle.Reason != null)
+            if(vehicle.Plate != null && vehicle.Reason != null)
             {
-                vehicle.CreatedAt = DateUtils.GetNumericalDateOfTheDay();
                 if (await vehicle.Save())
                 {
                     player.Notify("Succès", "Véhicule enregistré !", NotificationManager.Type.Success);
