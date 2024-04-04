@@ -60,9 +60,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Entities\JobPoliceCitizen.cs" />
+    <Compile Include="Entities\JobPoliceOffense.cs" />
+    <Compile Include="Entities\JobPoliceRecord.cs" />
     <Compile Include="Entities\JobPoliceVehicle.cs" />
     <Compile Include="JobPolice.cs" />
-    <Compile Include="Points\JobPoliceWantedPoint.cs" />
+    <Compile Include="Points\JobPoliceCentralPoint.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup />

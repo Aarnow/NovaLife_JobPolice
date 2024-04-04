@@ -11,7 +11,7 @@ using JobPolice.Entities;
 using ModKit.Utils;
 using Life;
 using Life.VehicleSystem;
-public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, PatternData
+public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>, PatternData
 {
     [AutoIncrement][PrimaryKey] public int Id { get; set; }
     public string TypeName { get; set; }
@@ -22,10 +22,10 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
     [Ignore] public ModKit.ModKit Context { get; set; }
 
-    public JobPoliceWantedPoint() { }
-    public JobPoliceWantedPoint(bool isCreated)
+    public JobPoliceCentralPoint() { }
+    public JobPoliceCentralPoint(bool isCreated)
     {
-        TypeName = nameof(JobPoliceWantedPoint);
+        TypeName = nameof(JobPoliceCentralPoint);
     }
 
     /// <summary>
@@ -37,7 +37,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         var result = await Query(patternId);
 
         Id = patternId;
-        TypeName = nameof(JobPoliceWantedPoint);
+        TypeName = nameof(JobPoliceCentralPoint);
         PatternName = result.PatternName;
 
         //Add your other properties here
@@ -72,7 +72,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
     /// <param name="patternId">The ID of the pattern to be edited.</param>
     public async void EditPattern(Player player, int patternId)
     {
-        JobPoliceWantedPoint pattern = new JobPoliceWantedPoint(false);
+        JobPoliceCentralPoint pattern = new JobPoliceCentralPoint(false);
         pattern.Context = Context;
         await pattern.SetProperties(patternId);
 
@@ -160,6 +160,8 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         panel.AddTabLine("Véhicules recherchés", ui => JobPoliceVehicleWantedPanel(player));
         panel.AddTabLine("Citoyens enregistrés", ui => JobPoliceCitizenWantedPanel(player));
+        panel.AddTabLine("Infractions", ui => JobPoliceOffensePanel(player));
+
 
         panel.NextButton("Sélectionner", () => panel.SelectTab());
         panel.PreviousButton();
@@ -179,7 +181,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         {
             foreach(var v in query)
             {
-                panel.AddTabLine($"{v.Plate}", $"{DateUtils.ConvertNumericalDateToString(v.CreatedAt)}", VehicleUtils.getIconId(v.ModelId), ui => JobPoliceShowVehicleWantedPanel(player, v.Id));
+                panel.AddTabLine($"{v.Plate}", $"{DateUtils.ConvertNumericalDateToString(v.CreatedAt)}", VehicleUtils.GetIconId(v.ModelId), ui => JobPoliceShowVehicleWantedPanel(player, v.Id));
             }
 
             panel.NextButton("Consulter", () => panel.SelectTab());
@@ -205,7 +207,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         Panel panel = Context.PanelHelper.Create($"Détails du véhicule recherché", UIPanel.PanelType.Tab, player, () => JobPoliceShowVehicleWantedPanel(player, jobPoliceVehicleId));
 
-        panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {VehicleUtils.getModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
+        panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {VehicleUtils.GetModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
         panel.AddTabLine($"{mk.Color("Plaque:", mk.Colors.Info)} {vehicle.Plate}", ui => JobPoliceVehicleSetPlate(player, vehicle));
         panel.AddTabLine($"{mk.Color("Motif", mk.Colors.Info)} {vehicle.Reason}", ui => JobPoliceVehicleSetReason(player, vehicle));
         panel.AddTabLine($"{mk.Color("Recherché depuis le:", mk.Colors.Info)} {DateUtils.ConvertNumericalDateToString(vehicle.CreatedAt)}", ui =>
@@ -239,7 +241,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
 
         Panel panel = Context.PanelHelper.Create("Ajouter un véhicule recherché", UIPanel.PanelType.Tab, player, () => JobPoliceAddVehicleWantedPanel(player, jobPoliceVehicleId));
 
-        panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {VehicleUtils.getModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
+        panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {VehicleUtils.GetModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
         panel.AddTabLine($"{mk.Color("Plaque:", mk.Colors.Info)} {(vehicle?.Plate != null ? vehicle.Plate : ". . .")}", ui => JobPoliceVehicleSetPlate(player, vehicle));
         panel.AddTabLine($"{mk.Color("Motif: ", mk.Colors.Info)} {(vehicle?.Reason != null ? vehicle.Reason : ". . .")}", ui => JobPoliceVehicleSetReason(player, vehicle));
 
@@ -351,19 +353,21 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
         panel.Display();
     }
     #endregion
+
     #endregion
 
+    #region CITIZENS
     public async void JobPoliceCitizenWantedPanel(Player player)
     {
         var query = await JobPoliceCitizen.QueryAll();
 
-        Panel panel = Context.PanelHelper.Create("Citoyens recherchés", UIPanel.PanelType.Tab, player, () => JobPoliceCitizenWantedPanel(player));
+        Panel panel = Context.PanelHelper.Create("Citoyens enregistrés", UIPanel.PanelType.Tab, player, () => JobPoliceCitizenWantedPanel(player));
 
         if (query != null && query.Count > 0)
         {
             foreach (var c in query)
             {
-                panel.AddTabLine($"{c.Pseudonym}", ui => { });
+                panel.AddTabLine($"{c.Pseudonym}", ui => JobPoliceShowCitizenWantedPanel(player, c.Id));
             }
             panel.NextButton("Consulter", () => panel.SelectTab());
         }
@@ -400,7 +404,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
             }
             else
             {
-                player.Notify("Condition", "Le citoyen dont vous souhaitez relever les empreintes doit être à votre proximité", NotificationManager.Type.Info);
+                player.Notify("Condition", "\r\nLe citoyen dont vous souhaitez relever les empreintes doit être à proximité de vous", NotificationManager.Type.Warning);
                 panel.Refresh();
             }
         });
@@ -426,9 +430,9 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
             player.Notify("Erreur", "Vous ne pouvez pas modifier la date de création", NotificationManager.Type.Error);
             panel.Refresh();
         });
+        panel.AddTabLine($"{mk.Color("Consulter le casier judiciaire", mk.Colors.Warning)}", ui => JobPoliceCitizenRecordsPanel(player, citizen.Id));
 
-        panel.NextButton("Casier judiciaire", () => { });
-        panel.NextButton("Modifier", () => panel.SelectTab());
+        panel.NextButton("Sélectionner", () => panel.SelectTab());
         panel.PreviousButtonWithAction("Supprimer", async () =>
         {
             if(player.biz.OwnerId == player.character.Id)
@@ -451,6 +455,31 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
                 return false;
             }
         });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+
+    public async void JobPoliceCitizenRecordsPanel(Player player, int citizenId)
+    {
+        var records = await JobPoliceRecord.Query(r => r.CitizenId == citizenId);
+        var offenses = await JobPoliceOffense.QueryAll();
+
+        Panel panel = Context.PanelHelper.Create($"Casier judiciaire", UIPanel.PanelType.TabPrice, player, () => JobPoliceCitizenRecordsPanel(player, citizenId));
+
+        if (records != null && records.Count != 0)
+        {
+            foreach (var record in records)
+            {
+                var offense = offenses.Where(o => o.Id == record.OffenseId).FirstOrDefault();
+                if (offense != null) panel.AddTabLine($"{offense.Title}", $"{record.CreatedAt}", 0, _ => { });
+            }
+        }
+        else panel.AddTabLine("Aucun casier judiciaire", _ => { });
+
+        //ajouter
+        //retirer
         panel.PreviousButton();
         panel.CloseButton();
 
@@ -719,6 +748,277 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
     #endregion
     #endregion
 
+    #region OFFENSES
+
+    #endregion
+    public async void JobPoliceOffensePanel(Player player)
+    {
+        var query = await JobPoliceOffense.QueryAll();
+
+        Panel panel = Context.PanelHelper.Create("Infractions", UIPanel.PanelType.TabPrice, player, () => JobPoliceOffensePanel(player));
+
+        if (query != null && query.Count > 0)
+        {
+            foreach (var offense in query)
+            {
+                panel.AddTabLine($"{offense.Title}", $"{offense.OffenseType}", ItemUtils.GetIconIdByItemId(offense.OffenseTag[offense.OffenseType]), ui => JobPoliceShowOffensePanel(player, offense.Id));
+            }
+
+            panel.NextButton("Consulter", () => panel.SelectTab());
+
+        }
+        else panel.AddTabLine("Aucun", _ => { });
+
+        if (player.biz.OwnerId == player.character.Id)
+        {
+            panel.NextButton("Ajouter", async () =>
+            {
+                var newOffense = new JobPoliceOffense();
+                await newOffense.Save();
+                JobPoliceAddOffensePanel(player, newOffense.Id);
+            });
+        }
+        
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+
+    public async void JobPoliceShowOffensePanel(Player player, int jobPoliceOffenseId)
+    {
+        var query = await JobPoliceOffense.Query(o => o.Id == jobPoliceOffenseId);
+        var offense = query?[0];
+
+        Panel panel = Context.PanelHelper.Create($"Détails de l'infraction", UIPanel.PanelType.Tab, player, () => JobPoliceShowOffensePanel(player, jobPoliceOffenseId));
+
+        panel.AddTabLine($"{mk.Color("Titre:", mk.Colors.Info)} {offense.Title}", ui => JobPoliceOffenseSetTitle(player, offense));
+        panel.AddTabLine($"{mk.Color("Type:", mk.Colors.Info)} {offense.OffenseType}", ui => JobPoliceOffenseSetType(player, offense));
+        panel.AddTabLine($"{mk.Color("Temps de prison:", mk.Colors.Info)} {offense.PrisonTime} secondes", ui => JobPoliceOffenseSetPrisonTime(player, offense));
+        panel.AddTabLine($"{mk.Color("Montant de l'amende:", mk.Colors.Info)} {offense.Money}€", ui => JobPoliceOffenseSetMoney(player, offense));
+        panel.AddTabLine($"{mk.Color("Retrait points de permis B:", mk.Colors.Info)} {offense.Points}", ui => JobPoliceOffenseSetPoints(player, offense));
+      
+        if(player.biz.OwnerId == player.character.Id)
+        {
+            panel.NextButton("Modifier", () => panel.SelectTab());
+            panel.PreviousButtonWithAction("Supprimer", async () =>
+            {
+                if (await offense.Delete())
+                {
+                    player.Notify("Succès", "Infraction supprimé", NotificationManager.Type.Success);
+                    return true;
+                }
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu supprimer cette infraction", NotificationManager.Type.Error);
+                    return false;
+                }
+            });
+        }
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+
+    public async void JobPoliceAddOffensePanel(Player player, int jobPoliceOffenseId)
+    {
+        var query = await JobPoliceOffense.Query(o => o.Id == jobPoliceOffenseId);
+        var offense = query?[0];
+
+        Panel panel = Context.PanelHelper.Create("Ajouter une infraction", UIPanel.PanelType.Tab, player, () => JobPoliceAddOffensePanel(player, jobPoliceOffenseId));
+
+
+        panel.AddTabLine($"{mk.Color("Titre:", mk.Colors.Info)} {(offense.Title != null ? $"{offense.Title}" : $"{mk.Italic("à définir")}")}", ui => JobPoliceOffenseSetTitle(player, offense));
+        panel.AddTabLine($"{mk.Color("Type:", mk.Colors.Info)} {(offense.OffenseType != null ? $"{offense.OffenseType}" : $"{mk.Italic("à définir")}")}", ui => JobPoliceOffenseSetType(player, offense));
+        panel.AddTabLine($"{mk.Color("Temps de prison:", mk.Colors.Info)} {offense.PrisonTime} secondes", ui => JobPoliceOffenseSetPrisonTime(player, offense));
+        panel.AddTabLine($"{mk.Color("Montant de l'amende:", mk.Colors.Info)} {offense.Money}€", ui => JobPoliceOffenseSetMoney(player, offense));
+        panel.AddTabLine($"{mk.Color("Retrait points de permis B:", mk.Colors.Info)} {offense.Points}", ui => JobPoliceOffenseSetPoints(player, offense));
+        
+
+        panel.NextButton("Modifier", () => panel.SelectTab());
+        panel.PreviousButtonWithAction("Enregistrer", async () =>
+        {
+            if (offense.Title != null && offense.OffenseType != null)
+            {
+                if (await offense.Save())
+                {
+                    player.Notify("Succès", "Infraction enregistré !", NotificationManager.Type.Success);
+                    return await Task.FromResult(true);
+                }
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu enregistrer cette infraction", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Infraction incomplète", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    #region offense setters
+    public void JobPoliceOffenseSetTitle(Player player, JobPoliceOffense offense)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le titre de l'infraction", UIPanel.PanelType.Input, player, () => JobPoliceOffenseSetTitle(player, offense));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                offense.Title = panel.inputText;
+                if (await offense.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir le titre de l'infraction", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceOffenseSetType(Player player, JobPoliceOffense offense)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le type d'infraction", UIPanel.PanelType.Tab, player, () => JobPoliceOffenseSetType(player, offense));
+
+        foreach (var type in offense.OffenseTag)
+        {
+            panel.AddTabLine($"{type.Key}", async ui =>
+            {
+                offense.OffenseType = type.Key;
+                if (await offense.Save()) panel.Previous();
+                else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+            });
+        }
+
+        panel.AddButton("Sélectionner", ui => panel.SelectTab());
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceOffenseSetMoney(Player player, JobPoliceOffense offense)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le montant de l'amende de l'infraction", UIPanel.PanelType.Input, player, () => JobPoliceOffenseSetMoney(player, offense));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                if(double.TryParse(panel.inputText, out var amount))
+                {
+                    offense.Money = amount;
+                    if (await offense.Save()) return await Task.FromResult(true);
+                    else
+                    {
+                        player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                        return await Task.FromResult(false);
+                    }
+                } else
+                {
+                    player.Notify("Erreur", "format invalide", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir le titre de l'infraction", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceOffenseSetPrisonTime(Player player, JobPoliceOffense offense)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le temps de prison de l'infraction", UIPanel.PanelType.Input, player, () => JobPoliceOffenseSetPrisonTime(player, offense));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+               if(int.TryParse(panel.inputText, out int value))
+                {
+                    offense.PrisonTime = value;
+                    if (await offense.Save()) return await Task.FromResult(true);
+                    else
+                    {
+                        player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                        return await Task.FromResult(false);
+                    }
+                }
+                else
+                {
+                    player.Notify("Erreur", "format invalide", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir le titre de l'infraction", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    public void JobPoliceOffenseSetPoints(Player player, JobPoliceOffense offense)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le retrait de points de l'infraction", UIPanel.PanelType.Input, player, () => JobPoliceOffenseSetPoints(player, offense));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                if (int.TryParse(panel.inputText, out int value))
+                {
+                    offense.Points = value;
+                    if (await offense.Save()) return await Task.FromResult(true);
+                    else
+                    {
+                        player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                        return await Task.FromResult(false);
+                    }
+                }
+                else
+                {
+                    player.Notify("Erreur", "format invalide", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir le titre de l'infraction", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+    #endregion
+    #endregion
+
     #region REPLACE YOUR CLASS/TYPE AS PARAMETER
     /// <summary>
     /// Displays a panel allowing the player to select a pattern from a list of patterns.
@@ -726,7 +1026,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
     /// <param name="player">The player selecting the pattern.</param>
     /// <param name="patterns">The list of patterns to choose from.</param>
     /// <param name="configuring">A flag indicating if the player is configuring.</param>
-    public void SelectPattern(Player player, List<JobPoliceWantedPoint> patterns, bool configuring)
+    public void SelectPattern(Player player, List<JobPoliceCentralPoint> patterns, bool configuring)
     {
         Panel panel = Context.PanelHelper.Create("Choisir un modèle", UIPanel.PanelType.Tab, player, () => SelectPattern(player, patterns, configuring));
 
@@ -768,7 +1068,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
     /// </summary>
     /// <param name="player">The player confirming the point generation.</param>
     /// <param name="pattern">The pattern to generate the point from.</param>
-    public void ConfirmGeneratePoint(Player player, JobPoliceWantedPoint pattern)
+    public void ConfirmGeneratePoint(Player player, JobPoliceCentralPoint pattern)
     {
         Panel panel = Context.PanelHelper.Create($"Modèle \"{pattern.PatternName}\" enregistré !", UIPanel.PanelType.Text, player, () =>
         ConfirmGeneratePoint(player, pattern));
@@ -867,7 +1167,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
     /// <param name="player">The player retrieving the NPoints.</param>
     public async Task GetNPoints(Player player)
     {
-        var points = await NPoint.Query(e => e.TypeName == nameof(JobPoliceWantedPoint));
+        var points = await NPoint.Query(e => e.TypeName == nameof(JobPoliceCentralPoint));
         SelectNPoint(player, points);
     }
 
@@ -879,7 +1179,7 @@ public class JobPoliceWantedPoint : ModKit.ORM.ModEntity<JobPoliceWantedPoint>, 
     public async void SelectNPoint(Player player, List<NPoint> points)
     {
         var patterns = await QueryAll();
-        Panel panel = Context.PanelHelper.Create($"Points de type {nameof(JobPoliceWantedPoint)}", UIPanel.PanelType.Tab, player, () => SelectNPoint(player, points));
+        Panel panel = Context.PanelHelper.Create($"Points de type {nameof(JobPoliceCentralPoint)}", UIPanel.PanelType.Tab, player, () => SelectNPoint(player, points));
 
         if (points.Count > 0)
         {

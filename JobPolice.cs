@@ -37,10 +37,12 @@ namespace JobPolice
         {
             Orm.RegisterTable<JobPoliceVehicle>();
             Orm.RegisterTable<JobPoliceCitizen>();
+            Orm.RegisterTable<JobPoliceOffense>();
+            Orm.RegisterTable<JobPoliceRecord>();
 
-            Orm.RegisterTable<JobPoliceWantedPoint>();
-            PointHelper.AddPattern("JobPoliceWantedPoint", new JobPoliceWantedPoint(false));
-            AAMenu.AAMenu.menu.AddBuilder(PluginInformations, "JobPoliceWantedPoint", new JobPoliceWantedPoint(false), this);
+            Orm.RegisterTable<JobPoliceCentralPoint>();
+            PointHelper.AddPattern(nameof(JobPoliceCentralPoint), new JobPoliceCentralPoint(false));
+            AAMenu.AAMenu.menu.AddBuilder(PluginInformations, nameof(JobPoliceCentralPoint), new JobPoliceCentralPoint(false), this);
         }
 
         public void InsertMenu()
@@ -139,31 +141,31 @@ namespace JobPolice
 
         public async void JobPolicePointsPanel(Player player)
         {
-            var points = await NPoint.Query(p => p.TypeName == nameof(JobPoliceWantedPoint));
+            var points = await NPoint.Query(p => p.TypeName == nameof(JobPoliceCentralPoint));
 
-            #region JobPoliceWanted
-            var wantedPoints = points.Where(p => p.TypeName == nameof(JobPoliceWantedPoint)).ToList();
-            var wantedPatterns = await JobPoliceWantedPoint.Query(p => p.BizId == player.biz.Id);
-            List<int> wantedPatternIds = wantedPatterns.Select(p => p.Id).ToList();
-            var wantedPointsResult = wantedPoints.Where(point => wantedPatternIds.Contains(point.PatternId)).ToList();
+            #region JobPoliceCentral
+            var centralPoints = points.Where(p => p.TypeName == nameof(JobPoliceCentralPoint)).ToList();
+            var centralPatterns = await JobPoliceCentralPoint.Query(p => p.BizId == player.biz.Id);
+            List<int> centralPatternIds = centralPatterns.Select(p => p.Id).ToList();
+            var centralPointsResult = centralPoints.Where(point => centralPatternIds.Contains(point.PatternId)).ToList();
             #endregion
 
-            Panel panel = PanelHelper.Create("Centrale Points", UIPanel.PanelType.Tab, player, () => JobPolicePointsPanel(player));
+            Panel panel = PanelHelper.Create("Points des forces de l'ordre", UIPanel.PanelType.Tab, player, () => JobPolicePointsPanel(player));
 
-            panel.AddTabLine("Point d'avis de recherche", async ui => {
-                if (wantedPointsResult?.Count > 0)
+            panel.AddTabLine("Point du centre de commandement", async ui => {
+                if (centralPointsResult?.Count > 0)
                 {
-                    bool result = await PointHelper.SetNPointPosition(player, wantedPointsResult[0]);
+                    bool result = await PointHelper.SetNPointPosition(player, centralPointsResult[0]);
                     if (result) panel.Refresh();
                     else player.Notify("Oops", "Votre point est déjà sur cette position", NotificationManager.Type.Error);
                 }
                 else
                 {
-                    JobPoliceWantedPoint wantedPoint = new JobPoliceWantedPoint(false);
-                    wantedPoint.PatternName = $"Avis de recherches";
-                    wantedPoint.BizId = player.biz.Id;
-                    await wantedPoint.Save();
-                    await PointHelper.CreateNPoint(player, wantedPoint);
+                    JobPoliceCentralPoint centralPoint = new JobPoliceCentralPoint(false);
+                    centralPoint.PatternName = $"Centrale";
+                    centralPoint.BizId = player.biz.Id;
+                    await centralPoint.Save();
+                    await PointHelper.CreateNPoint(player, centralPoint);
                     panel.Refresh();
                 }
             });
@@ -174,8 +176,8 @@ namespace JobPolice
                 switch (panel.selectedTab)
                 {
                     case 0:
-                        await PointHelper.DeleteNPointsByPattern(player, wantedPatterns[0]);
-                        await wantedPatterns[0].Delete();
+                        await PointHelper.DeleteNPointsByPattern(player, centralPatterns[0]);
+                        await centralPatterns[0].Delete();
                         break;
                     default:
                         Logger.LogError("JobPolicePointsPanel", "Erreur lors de la sélection du point.");
