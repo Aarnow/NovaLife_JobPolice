@@ -209,7 +209,7 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
 
         panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {VehicleUtils.GetModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
         panel.AddTabLine($"{mk.Color("Plaque:", mk.Colors.Info)} {vehicle.Plate}", ui => JobPoliceVehicleSetPlate(player, vehicle));
-        panel.AddTabLine($"{mk.Color("Motif", mk.Colors.Info)} {vehicle.Reason}", ui => JobPoliceVehicleSetReason(player, vehicle));
+        panel.AddTabLine($"{mk.Color("Motif:", mk.Colors.Info)} {vehicle.Reason}", ui => JobPoliceVehicleSetReason(player, vehicle));
         panel.AddTabLine($"{mk.Color("Recherché depuis le:", mk.Colors.Info)} {DateUtils.ConvertNumericalDateToString(vehicle.CreatedAt)}", ui =>
         {
             player.Notify("Erreur", "Vous ne pouvez pas modifier la date de création", NotificationManager.Type.Error);
@@ -415,13 +415,14 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         panel.AddTabLine($"{mk.Color("Sexe:", mk.Colors.Info)} {(citizen.Sexe != null ? $"{citizen.Sexe}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSexe(player, citizen));
         panel.AddTabLine($"{mk.Color("Couleur des yeux:", mk.Colors.Info)} {(citizen.EyesColor != default ? $"{citizen.EyesColor}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetEyesColor(player, citizen));
         panel.AddTabLine($"{mk.Color("Couleur de peau:", mk.Colors.Info)} {(citizen.SkinColor != null ? $"{citizen.SkinColor}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSkinColor(player, citizen));
-        panel.AddTabLine($"{mk.Color("Recherché:", mk.Colors.Info)} {(citizen.Wanted ? "oui" : "non")}", async ui => {
-            citizen.Wanted = !citizen.Wanted;
+        panel.AddTabLine($"{mk.Color("Recherché:", mk.Colors.Info)} {(citizen.IsWanted ? "oui" : "non")}", async ui => {
+            citizen.IsWanted = !citizen.IsWanted;
             if (await citizen.Save()) panel.Refresh();
             else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
         });
-        panel.AddTabLine($"{mk.Color("Fichier S:", mk.Colors.Info)} {(citizen.Dangerous ? "oui" : "non")}", async ui => {
-            citizen.Dangerous = !citizen.Dangerous;
+        if(citizen.IsWanted) panel.AddTabLine($"{mk.Color("Motif de la recherche:", mk.Colors.Info)} {(citizen.Reason != null ? $"{citizen.Reason}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetReason(player, citizen));
+        panel.AddTabLine($"{mk.Color("Fichier S:", mk.Colors.Info)} {(citizen.IsDangerous ? "oui" : "non")}", async ui => {
+            citizen.IsDangerous = !citizen.IsDangerous;
             if (await citizen.Save()) panel.Refresh();
             else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
         });
@@ -478,8 +479,6 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         }
         else panel.AddTabLine("Aucun casier judiciaire", _ => { });
 
-        //ajouter
-        //retirer
         panel.PreviousButton();
         panel.CloseButton();
 
@@ -515,13 +514,14 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         panel.AddTabLine($"{mk.Color("Sexe:", mk.Colors.Info)} {(citizen.Sexe != null ? $"{citizen.Sexe}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSexe(player, citizen));
         panel.AddTabLine($"{mk.Color("Couleur des yeux:", mk.Colors.Info)} {(citizen.EyesColor != default ? $"{citizen.EyesColor}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetEyesColor(player, citizen));
         panel.AddTabLine($"{mk.Color("Couleur de peau:", mk.Colors.Info)} {(citizen.SkinColor != null ? $"{citizen.SkinColor}": $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSkinColor(player, citizen));
-        panel.AddTabLine($"{mk.Color("Recherché:", mk.Colors.Info)} {(citizen.Wanted ? "oui":"non")}", async ui => {
-            citizen.Wanted = !citizen.Wanted;
+        panel.AddTabLine($"{mk.Color("Recherché:", mk.Colors.Info)} {(citizen.IsWanted ? "oui":"non")}", async ui => {
+            citizen.IsWanted = !citizen.IsWanted;
             if (await citizen.Save()) panel.Refresh();
             else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
         });
-        panel.AddTabLine($"{mk.Color("Fichier S:", mk.Colors.Info)} {(citizen.Dangerous ? "oui":"non")}", async ui => {
-            citizen.Dangerous = !citizen.Dangerous;
+        if (citizen.IsWanted) panel.AddTabLine($"{mk.Color("Motif de la recherche:", mk.Colors.Info)} {(citizen.Reason != null ? $"{citizen.Reason}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetReason(player, citizen));
+        panel.AddTabLine($"{mk.Color("Fichier S:", mk.Colors.Info)} {(citizen.IsDangerous ? "oui":"non")}", async ui => {
+            citizen.IsDangerous = !citizen.IsDangerous;
             if (await citizen.Save()) panel.Refresh();
             else player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette valeur", NotificationManager.Type.Error);
         });
@@ -745,12 +745,38 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
 
         panel.Display();
     }
+
+    public void JobPoliceCitizenSetReason(Player player, JobPoliceCitizen citizen)
+    {
+        Panel panel = Context.PanelHelper.Create("Définir le motif de recherche", UIPanel.PanelType.Input, player, () => JobPoliceCitizenSetReason(player, citizen));
+
+        panel.PreviousButtonWithAction("Valider", async () =>
+        {
+            if (panel.inputText != null)
+            {
+                citizen.Reason = panel.inputText;
+                if (await citizen.Save()) return await Task.FromResult(true);
+                else
+                {
+                    player.Notify("Erreur", "Nous n'avons pas pu mettre à jour cette donnée", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
+                }
+            }
+            else
+            {
+                player.Notify("Erreur", "Vous devez définir une valeur", NotificationManager.Type.Error);
+                return await Task.FromResult(false);
+            }
+        });
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
     #endregion
     #endregion
 
     #region OFFENSES
-
-    #endregion
     public async void JobPoliceOffensePanel(Player player)
     {
         var query = await JobPoliceOffense.QueryAll();
@@ -784,7 +810,6 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
 
         panel.Display();
     }
-
     public async void JobPoliceShowOffensePanel(Player player, int jobPoliceOffenseId)
     {
         var query = await JobPoliceOffense.Query(o => o.Id == jobPoliceOffenseId);
@@ -820,7 +845,6 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
 
         panel.Display();
     }
-
     public async void JobPoliceAddOffensePanel(Player player, int jobPoliceOffenseId)
     {
         var query = await JobPoliceOffense.Query(o => o.Id == jobPoliceOffenseId);
@@ -1017,6 +1041,8 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         panel.Display();
     }
     #endregion
+    #endregion
+
     #endregion
 
     #region REPLACE YOUR CLASS/TYPE AS PARAMETER

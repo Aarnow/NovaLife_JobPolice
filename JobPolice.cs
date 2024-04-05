@@ -1,14 +1,18 @@
 ﻿using JobPolice.Entities;
 using Life;
 using Life.BizSystem;
+using Life.DB;
 using Life.Network;
 using Life.UI;
+using Life.VehicleSystem;
 using ModKit.Helper;
 using ModKit.Helper.PointHelper;
 using ModKit.Interfaces;
 using ModKit.Internal;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using _menu = AAMenu.Menu;
 using mk = ModKit.Helper.TextFormattingHelper;
 
@@ -103,6 +107,7 @@ namespace JobPolice
                 Player player = PanelHelper.ReturnPlayerFromPanel(ui);
                 //rattaché à un citoyen (playerId) + fichier S + bracelet electronique (bip lorsqu'il pénètre dans certains lieux)
             });*/
+
             //avis de recherche
             //système de plainte avec date
             //système calcule auto de la peine + possibilité de réduction
@@ -120,13 +125,35 @@ namespace JobPolice
 
                 if (vehicle != null)
                 {
+                    LifeVehicle vehicleDb = Nova.v.GetVehicle(vehicle.plate);
+
+                    if (vehicle != null)
+                    {
+                        var owner = await LifeDB.FetchCharacter(vehicleDb.permissions.owner.characterId);
+                        if(owner != null)
+                        {
+                            player.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} le véhicule immatriculé {vehicle.plate} appartient à {owner.Firstname} {owner.Lastname}");
+                        }
+                        else player.Notify("Erreur", "Véhicule introuvable en base de données", NotificationManager.Type.Error);
+                    }
+                    else player.Notify("Erreur", "Véhicule introuvable en base de données", NotificationManager.Type.Error);
+
                     var query = await JobPoliceVehicle.Query(v => v.Plate == vehicle.plate);
                     if (query != null && query.Count != 0) player.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} le véhicule immatriculé {vehicle.plate} est recherché pour {query[0].Reason}");
                     else player.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} le véhicule immatriculé {vehicle.plate} ne figure pas dans vos bases de données.");
                 }
                 else player.Notify("Contrôler un véhicule", "Aucun véhicule à proximité", NotificationManager.Type.Error);
             });
-            panel.AddTabLine("Contrôler un citoyen", _ => {});
+            panel.AddTabLine("Contrôler un citoyen", ui => {
+                var target = player.GetClosestPlayer();
+
+                if (target != null)
+                {
+
+                    JobPoliceAskCI(target, player);
+                }
+                else player.Notify("Contrôler un citoyen", "Aucun citoyen à proximité", NotificationManager.Type.Error);
+            });
             //panel.AddTabLine("Policiers en ville", _ => {});
             if (player.character.Id == player.biz.OwnerId) panel.AddTabLine($"{mk.Color("Installer les points", mk.Colors.Warning)}", ui => JobPolicePointsPanel(player));
 
@@ -135,6 +162,44 @@ namespace JobPolice
                 AAMenu.AAMenu.menu.BizPanel(player, AAMenu.AAMenu.menu.BizTabLines);
             });
             panel.CloseButton();
+
+            panel.Display();
+        }
+
+        public void JobPoliceAskCI(Player toPlayer, Player fromPlayer)
+        {
+            Panel panel = PanelHelper.Create($"Contrôle d'identité", UIPanel.PanelType.Text, toPlayer, () => JobPoliceAskCI(toPlayer, fromPlayer));
+
+            panel.TextLines.Add($"Un agent des forces de l'ordre souhaite contrôler votre identité.");
+
+            panel.AddButton("Accepter", async (ui) =>
+            {
+                toPlayer.Notify("Contrôle d'identité", "Vous présentez votre carte d'identité", NotificationManager.Type.Warning, 6);
+
+                Character characterJson = toPlayer.GetCharacterJson();
+                fromPlayer.setup.TargetCreateCNI(characterJson);
+
+                var query = await JobPoliceCitizen.Query(c => c.Firstname == toPlayer.character.Firstname && c.Lastname == toPlayer.character.Lastname);
+                if (query != null && query.Count != 0)
+                {
+                    fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} le citoyen \"{toPlayer.GetFullName()}\" est connu de nos services.");
+                    if (query[0].IsDangerous) fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} {mk.Color("ATTENTION", mk.Colors.Warning)} \"{toPlayer.GetFullName()}\" est {mk.Color("FICHIER S", mk.Colors.Warning)}");
+                    if (query[0].IsWanted)
+                    {
+                        fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} {mk.Color("ALERTE", mk.Colors.Error)} \"{toPlayer.GetFullName()}\" est {mk.Color("RECHERCHÉ", mk.Colors.Error)}");
+                        fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} \"{toPlayer.GetFullName()}\" est recherché pour {query[0].Reason}");
+                    }
+                }
+                else fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} le citoyen est inconnu de nos services");
+
+                panel.Close();
+            });
+            panel.CloseButtonWithAction("Refuser", async () =>
+            {
+                fromPlayer.Notify("Contrôle d'identité", "Le citoyen refuse de montrer sa carte d'identité", NotificationManager.Type.Warning, 6);
+                toPlayer.Notify("Contrôle d'identité", "Vous refusez de présenter votre carte d'identité", NotificationManager.Type.Warning, 6);
+                return await Task.FromResult(true);
+            });
 
             panel.Display();
         }

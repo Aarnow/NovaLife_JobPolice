@@ -13,8 +13,9 @@ namespace JobPolice.Entities
         public string Sexe { get; set; }
         public string SkinColor { get; set; }
         public string EyesColor { get; set; }
-        public bool Wanted { get; set; }
-        public bool Dangerous { get; set; }
+        public bool IsWanted { get; set; }
+        public string Reason { get; set; }
+        public bool IsDangerous { get; set; }
         public int CreatedAt { get; set; }
         public JobPoliceCitizen()
         {
