@@ -10,7 +10,6 @@ using System.Linq;
 using JobPolice.Entities;
 using ModKit.Utils;
 using Life;
-using Life.VehicleSystem;
 public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>, PatternData
 {
     [AutoIncrement][PrimaryKey] public int Id { get; set; }
@@ -164,7 +163,6 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
 
 
         panel.NextButton("Sélectionner", () => panel.SelectTab());
-        panel.PreviousButton();
         panel.CloseButton();
 
         panel.Display();
@@ -207,7 +205,7 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
 
         Panel panel = Context.PanelHelper.Create($"Détails du véhicule recherché", UIPanel.PanelType.Tab, player, () => JobPoliceShowVehicleWantedPanel(player, jobPoliceVehicleId));
 
-        panel.AddTabLine($"{mk.Color("Nom du modèle:", mk.Colors.Info)} {VehicleUtils.GetModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
+        panel.AddTabLine($"{mk.Color("Modèle:", mk.Colors.Info)} {VehicleUtils.GetModelNameByModelId(vehicle.ModelId)}", ui => JobPoliceVehicleSetModel(player, vehicle));
         panel.AddTabLine($"{mk.Color("Plaque:", mk.Colors.Info)} {vehicle.Plate}", ui => JobPoliceVehicleSetPlate(player, vehicle));
         panel.AddTabLine($"{mk.Color("Motif:", mk.Colors.Info)} {vehicle.Reason}", ui => JobPoliceVehicleSetReason(player, vehicle));
         panel.AddTabLine($"{mk.Color("Recherché depuis le:", mk.Colors.Info)} {DateUtils.ConvertNumericalDateToString(vehicle.CreatedAt)}", ui =>
@@ -336,7 +334,7 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         {
             if (!model.isDeprecated)
             {
-                panel.AddTabLine($"{model.vehicleName}", async ui =>
+                panel.AddTabLine($"{model.vehicleName}", "", VehicleUtils.GetIconId(index), async ui =>
                 {
                     vehicle.ModelId = index;
 
@@ -412,7 +410,7 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         panel.AddTabLine($"{mk.Color("Nom:", mk.Colors.Info)} {(citizen.Lastname != null ? $"{citizen.Lastname}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetLastname(player, citizen));
         panel.AddTabLine($"{mk.Color("Prénom:", mk.Colors.Info)} {(citizen.Firstname != null ? $"{citizen.Firstname}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetFirstname(player, citizen));
         panel.AddTabLine($"{mk.Color("Téléphone:", mk.Colors.Info)} {(citizen.PhoneNumber != null ? $"{citizen.PhoneNumber}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetPhoneNumber(player, citizen));
-        panel.AddTabLine($"{mk.Color("Sexe:", mk.Colors.Info)} {(citizen.Sexe != null ? $"{citizen.Sexe}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSexe(player, citizen));
+        panel.AddTabLine($"{mk.Color("Genre:", mk.Colors.Info)} {(citizen.Sexe != null ? $"{citizen.Sexe}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSexe(player, citizen));
         panel.AddTabLine($"{mk.Color("Couleur des yeux:", mk.Colors.Info)} {(citizen.EyesColor != default ? $"{citizen.EyesColor}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetEyesColor(player, citizen));
         panel.AddTabLine($"{mk.Color("Couleur de peau:", mk.Colors.Info)} {(citizen.SkinColor != null ? $"{citizen.SkinColor}" : $"{mk.Italic("inconnu")}")}", ui => JobPoliceCitizenSetSkinColor(player, citizen));
         panel.AddTabLine($"{mk.Color("Recherché:", mk.Colors.Info)} {(citizen.IsWanted ? "oui" : "non")}", async ui => {
@@ -449,7 +447,6 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
                     return false;
                 }
             }
-
             else
             {
                 player.Notify("Erreur", "Vous n'avez pas l'autorisation de détruire ce document", NotificationManager.Type.Error);
@@ -473,11 +470,29 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         {
             foreach (var record in records)
             {
-                var offense = offenses.Where(o => o.Id == record.OffenseId).FirstOrDefault();
-                if (offense != null) panel.AddTabLine($"{offense.Title}", $"{record.CreatedAt}", 0, _ => { });
+                panel.AddTabLine($"Bulletin n°{record.Id}: {(record.IsPaid ? $"{mk.Color("Payé", mk.Colors.Success)}" : $"{mk.Color("Impayé", mk.Colors.Error)}")}", $"{DateUtils.ConvertNumericalDateToString(record.CreatedAt)}", 499, ui => JobPoliceCitizenRecordDetailsPanel(player, record));
             }
+            panel.NextButton("Sélectionner", () => panel.SelectTab());
         }
         else panel.AddTabLine("Aucun casier judiciaire", _ => { });
+
+        panel.PreviousButton();
+        panel.CloseButton();
+
+        panel.Display();
+    }
+
+    public async void JobPoliceCitizenRecordDetailsPanel(Player player, JobPoliceRecord jobPoliceRecord)
+    {
+        var offenses = await JobPoliceOffense.QueryAll();
+
+        Panel panel = Context.PanelHelper.Create($"Casier judiciaire n°{jobPoliceRecord.Id}", UIPanel.PanelType.TabPrice, player, () => JobPoliceCitizenRecordDetailsPanel(player, jobPoliceRecord));
+
+        foreach (var offenseId in jobPoliceRecord.LOffenseList)
+        {
+            var currentOffense = offenses.Where(o => o.Id == offenseId).FirstOrDefault();
+            if (currentOffense != null) panel.AddTabLine($"{currentOffense.Title}", $"{currentOffense.OffenseType}", 0, _ => { });
+        }
 
         panel.PreviousButton();
         panel.CloseButton();
@@ -491,7 +506,7 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         var citizen = query?[0];
 
         Panel panel = Context.PanelHelper.Create("Ajouter un citoyen", UIPanel.PanelType.Tab, player, () => JobPoliceAddCitizenWantedPanel(player, jobPoliceCitizenId));
-
+        
         panel.AddTabLine($"{mk.Color("Empreintes digitales:", mk.Colors.Info)} {(citizen.CharacterId != default ? $"[{citizen.CharacterId}]": $"{mk.Italic("inconnu")}")}", async ui =>
         {
             var target = player.GetClosestPlayer();
