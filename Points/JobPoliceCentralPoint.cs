@@ -802,7 +802,7 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         {
             foreach (var offense in query)
             {
-                panel.AddTabLine($"{offense.Title}", $"{offense.OffenseType}", ItemUtils.GetIconIdByItemId(offense.OffenseTag[offense.OffenseType]), ui => JobPoliceShowOffensePanel(player, offense.Id));
+                panel.AddTabLine($"{(offense.Title != null ? $"{offense.Title}":"à définir")}", $"{(offense.OffenseType != null ? $"{offense.OffenseType}" : "à définir")}", offense.OffenseType != null ? ItemUtils.GetIconIdByItemId(offense.OffenseTag[offense.OffenseType]) : -1, ui => JobPoliceShowOffensePanel(player, offense.Id));
             }
 
             panel.NextButton("Consulter", () => panel.SelectTab());

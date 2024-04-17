@@ -28,7 +28,7 @@ namespace JobPolice
         public static string ConfigDirectoryPath;
         public static string ConfigDrugsConfigFilePath;
         private readonly MyEvents _events;
-        private DrugsConfig _drugsConfig;
+        public static DrugsConfig _drugsConfig;
 
         public JobPolice(IGameAPI api) : base(api)
         {
@@ -70,8 +70,9 @@ namespace JobPolice
         {
             DrugsConfig drugsConfig = new DrugsConfig();
 
-            drugsConfig.DurationOfAlcohol = 30;
-            drugsConfig.DurationOfCannabis = 30;
+            drugsConfig.DurationOfAlcohol = 20;
+            drugsConfig.DurationOfCannabis = 20;
+            drugsConfig.DurationOfDruged = 20;
 
             string json = JsonConvert.SerializeObject(drugsConfig, Formatting.Indented);
             File.WriteAllText(ConfigDrugsConfigFilePath, json);
@@ -288,7 +289,7 @@ namespace JobPolice
 
             panel.TextLines.Add($"Un agent des forces de l'ordre souhaite contrôler votre identité.");
 
-            panel.AddButton("Accepter", async (ui) =>
+            panel.CloseButtonWithAction("Accepter", async () =>
             {
                 toPlayer.Notify("Contrôle d'identité", "Vous présentez votre carte d'identité", NotificationManager.Type.Warning, 6);
 
@@ -303,12 +304,12 @@ namespace JobPolice
                     if (query[0].IsWanted)
                     {
                         fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} {mk.Color("ALERTE", mk.Colors.Error)} \"{toPlayer.GetFullName()}\" est {mk.Color("RECHERCHÉ", mk.Colors.Error)}");
-                        fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} \"{toPlayer.GetFullName()}\" est recherché pour {(query[0].Reason.Length > 0 ? query[0].Reason : "???")}");
+                        fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} \"{toPlayer.GetFullName()}\" est recherché pour {(query[0].Reason?.Length > 0 ? query[0].Reason : "???")}");
                     }
                 }
                 else fromPlayer.SendText($"{mk.Color("Centrale:", mk.Colors.Info)} le citoyen est inconnu de nos services");
 
-                panel.Close();
+                return await Task.FromResult(true);
             });
             panel.CloseButtonWithAction("Refuser", async () =>
             {
@@ -414,7 +415,7 @@ namespace JobPolice
                 if (InventoryUtils.TargetOpenPlayerInventory(fromPlayer, toPlayer))
                 {
                     fromPlayer.Notify("Fouille policière", "Ce citoyen coopère et vous débutez votre fouille", NotificationManager.Type.Warning, 6);
-                    fromPlayer.SendText($"{mk.Color("Fouille policière:", mk.Colors.Info)} {toPlayer.GetFullName()} possède {toPlayer.character.Money}€ en liquide.");
+                    fromPlayer.SendText($"{mk.Color("Fouille policière:", mk.Colors.Info)} {toPlayer.GetFullName()} possède {mk.Color($"{toPlayer.character.Money}", mk.Colors.Warning)}€ en liquide.");
                     toPlayer.Notify("Fouille policière", "Vous avez accepté d'être fouillé", NotificationManager.Type.Warning, 6);
                     return await Task.FromResult(true);
                 }
@@ -437,7 +438,7 @@ namespace JobPolice
 
         public async void JobPoliceVerbalize(Player fromPlayer, Player toPlayer, List<int> offenseList)
         {
-            var query = await JobPoliceOffense.Query(q => q.PrisonTime < 1);
+            var query = await JobPoliceOffense.Query(q => q.PrisonTime < 1 && q.OffenseType != null);
             double money = 0.0;
             int points = 0;
 
@@ -453,7 +454,7 @@ namespace JobPolice
                         money += offense.Money;
                         points += offense.Points;
                     }
-                    panel.AddTabLine($"{mk.Color($"{offense.Title}", isSelected ? mk.Colors.Success : mk.Colors.Error)}", $"{offense.OffenseType}", ItemUtils.GetIconIdByItemId(offense.OffenseTag[offense.OffenseType]), ui =>
+                    panel.AddTabLine($"{mk.Color($"{(offense.Title != null ? $"{offense.Title}" : "à définir")}", isSelected ? mk.Colors.Success : mk.Colors.Error)}", $"{(offense.OffenseType != null ? $"{offense.OffenseType}" : "à définir")}", offense.OffenseType != null ? ItemUtils.GetIconIdByItemId(offense.OffenseTag[offense.OffenseType]) : -1, ui =>
                     {
                         if (isSelected) offenseList.Remove(offense.Id);
                         else offenseList.Add(offense.Id);
@@ -479,7 +480,7 @@ namespace JobPolice
 
         public void JobPoliceVerbalizeRequest(Player fromPlayer, Player toPlayer, double money, int points)
         {
-            Panel panel = PanelHelper.Create($"Verbaliser", UIPanel.PanelType.Text, toPlayer, () => JobPoliceVerbalizeRequest(fromPlayer, toPlayer, money, points));
+            Panel panel = PanelHelper.Create($"Verbaliser", UIPanel.PanelType.Text, fromPlayer, () => JobPoliceVerbalizeRequest(fromPlayer, toPlayer, money, points));
 
             panel.TextLines.Add($"{mk.Color("Montant de l'amende: ", mk.Colors.Info)} {money}€");
             panel.TextLines.Add($"{mk.Color("Retrait points de permis: ", mk.Colors.Info)} {points}");
@@ -488,14 +489,14 @@ namespace JobPolice
             {
                 toPlayer.Notify("Verbalisation", $"Le citoyen accepte la verbalisation", NotificationManager.Type.Success);
 
-                if (fromPlayer.character.Bank > money)
+                if (fromPlayer.character.Bank >= money)
                 {
                     fromPlayer.AddBankMoney(-money);
                     toPlayer.biz.Bank += money;
                     toPlayer.Notify("Verbalisation", $"Le citoyen paye son amende", NotificationManager.Type.Success);
                     fromPlayer.Notify("Verbalisation", $"Vous venez de payer {money}€ d'amende depuis votre compte en banque", NotificationManager.Type.Info, 10);
                 }
-                else if (fromPlayer.character.Money > money)
+                else if (fromPlayer.character.Money >= money)
                 {
                     fromPlayer.AddMoney(-money, "verbalisation");
                     toPlayer.biz.Bank += money;
@@ -507,7 +508,7 @@ namespace JobPolice
                     toPlayer.Notify("Verbalisation", $"Le citoyen n'a pas les moyens de payer l'amende", NotificationManager.Type.Error);
                 }
 
-                if (!fromPlayer.permisVehicle)
+                if (!fromPlayer.character.PermisB)
                 {
                     toPlayer.Notify("Verbalisation", $"Le citoyen n'ayant pas le permis B, aucun points ne peut être retiré.", NotificationManager.Type.Success);
                 } else

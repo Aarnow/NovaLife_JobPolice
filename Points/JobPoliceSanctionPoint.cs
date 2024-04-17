@@ -12,6 +12,7 @@ using JobPolice.Entities;
 using ModKit.Utils;
 using static UnityEngine.GraphicsBuffer;
 using Steamworks.Ugc;
+using Life;
 
 namespace JobPolice.Points
 {
@@ -276,19 +277,19 @@ namespace JobPolice.Points
                             player.character.PermisB = false;
                         }
                         player.SetPrisonTime(prisonTime);
-                        player.Notify("Sanction acceptée", "Vous venez d'accepter votre sort.", Life.NotificationManager.Type.Success, 10);
+                        player.Notify("Sanction acceptée", "Vous venez d'accepter votre sort.", NotificationManager.Type.Success, 10);
 
                         return await Task.FromResult(true);
                     }
                     else
                     {
-                        player.Notify("Erreur", "Nous n'avons pas pu appliquer votre sanction.", Life.NotificationManager.Type.Error);
+                        player.Notify("Erreur", "Nous n'avons pas pu appliquer votre sanction.", NotificationManager.Type.Error);
                         return await Task.FromResult(false);
                     }
                 }
                 else
                 {
-                    player.Notify("Erreur", "Vous avez déjà payé cette dette à la société", Life.NotificationManager.Type.Error);
+                    player.Notify("Erreur", "Vous avez déjà payé cette dette à la société", NotificationManager.Type.Error);
                     return await Task.FromResult(false);
                 }
 

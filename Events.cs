@@ -3,6 +3,7 @@ using Life;
 using Life.Network;
 using ModKit.Utils;
 using System;
+using System.Threading.Tasks;
 using mk = ModKit.Helper.TextFormattingHelper;
 
 namespace JobPolice
@@ -15,8 +16,6 @@ namespace JobPolice
 
         public async override void OnPlayerConsumeAlcohol(Player player, int itemId, float alcoholValue)
         {
-            Console.WriteLine($"{player.GetFullName()} vient de boire {alcoholValue} degré d'alcool.");
-
             var query = await JobPoliceDrugs.Query(d => d.CharacterId == player.character.Id);
             if(query != null && query.Count > 0)
             {
@@ -28,6 +27,13 @@ namespace JobPolice
                 newJobPoliceDrugs.CharacterId = player.character.Id;
                 newJobPoliceDrugs.LastAlcohol = DateUtils.GetCurrentTime();
                 await newJobPoliceDrugs.Save();
+            }
+
+            if (!player.setup.NetworkisDruged)
+            {
+                player.setup.NetworkisDruged = true;
+                await Task.Delay(TimeSpan.FromSeconds(JobPolice._drugsConfig.DurationOfDruged));
+                player.setup.NetworkisDruged = false;
             }
         }
 
@@ -46,6 +52,13 @@ namespace JobPolice
                 newJobPoliceDrugs.CharacterId = player.character.Id;
                 newJobPoliceDrugs.LastCannabis = DateUtils.GetCurrentTime();
                 await newJobPoliceDrugs.Save();
+            }
+
+            if (!player.setup.NetworkisDruged)
+            {
+                player.setup.NetworkisDruged = true;
+                await Task.Delay(TimeSpan.FromSeconds(JobPolice._drugsConfig.DurationOfDruged));
+                player.setup.NetworkisDruged = false;
             }
         }
 

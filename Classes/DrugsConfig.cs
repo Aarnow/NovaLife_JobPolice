@@ -4,5 +4,6 @@
     {
         public long DurationOfAlcohol;
         public long DurationOfCannabis;
+        public long DurationOfDruged;
     }
 }
