@@ -26,9 +26,9 @@ namespace JobPolice
     public class JobPolice : ModKit.ModKit
     {
         public static string ConfigDirectoryPath;
-        public static string ConfigDrugsConfigFilePath;
+        public static string ConfigJobPoliceConfigFilePath;
         private readonly MyEvents _events;
-        public static DrugsConfig _drugsConfig;
+        public static JobPoliceConfig _jobPoliceConfig;
 
         public JobPolice(IGameAPI api) : base(api)
         {
@@ -44,9 +44,17 @@ namespace JobPolice
             InsertMenu();
 
             _events.Init(Nova.server);
-            _drugsConfig = LoadConfigFile(ConfigDrugsConfigFilePath);
+            _jobPoliceConfig = LoadConfigFile(ConfigJobPoliceConfigFilePath);
 
-            ModKit.Internal.Logger.LogSuccess($"{PluginInformations.SourceName} v{PluginInformations.Version}", "initialisé");
+            new SChatCommand("/jobpolice", "mise à jour avec le fichier config jobpolice", "/jobpolice", (player, arg) => {
+                if(player.IsAdmin)
+                {
+                    _jobPoliceConfig = LoadConfigFile(ConfigJobPoliceConfigFilePath);
+                    player.Notify("JobPolice", "Config mise à jour", NotificationManager.Type.Success);
+                }
+            }).Register();
+
+            Logger.LogSuccess($"{PluginInformations.SourceName} v{PluginInformations.Version}", "initialisé");
         }
 
         #region CONFIG
@@ -55,10 +63,10 @@ namespace JobPolice
             try
             {
                 ConfigDirectoryPath = DirectoryPath + "/JobPolice";
-                ConfigDrugsConfigFilePath = Path.Combine(ConfigDirectoryPath, "drugsConfig.json");
+                ConfigJobPoliceConfigFilePath = Path.Combine(ConfigDirectoryPath, "Config.json");
 
                 if (!Directory.Exists(ConfigDirectoryPath)) Directory.CreateDirectory(ConfigDirectoryPath);
-                if (!File.Exists(ConfigDrugsConfigFilePath)) InitDrugsConfigFile();
+                if (!File.Exists(ConfigJobPoliceConfigFilePath)) InitDrugsConfigFile();
             }
             catch (IOException ex)
             {
@@ -68,22 +76,23 @@ namespace JobPolice
 
         private void InitDrugsConfigFile()
         {
-            DrugsConfig drugsConfig = new DrugsConfig();
+            JobPoliceConfig jobPoliceConfig = new JobPoliceConfig();
 
-            drugsConfig.DurationOfAlcohol = 20;
-            drugsConfig.DurationOfCannabis = 20;
-            drugsConfig.DurationOfDruged = 20;
+            jobPoliceConfig.DurationOfAlcohol = 20;
+            jobPoliceConfig.DurationOfCannabis = 20;
+            jobPoliceConfig.DurationOfDruged = 20;
+            jobPoliceConfig.LawEnforcementBizId = 1;
 
-            string json = JsonConvert.SerializeObject(drugsConfig, Formatting.Indented);
-            File.WriteAllText(ConfigDrugsConfigFilePath, json);
+            string json = JsonConvert.SerializeObject(jobPoliceConfig, Formatting.Indented);
+            File.WriteAllText(ConfigJobPoliceConfigFilePath, json);
         }
 
-        private DrugsConfig LoadConfigFile(string path)
+        private JobPoliceConfig LoadConfigFile(string path)
         {
             if (File.Exists(path))
             {
                 string jsonContent = File.ReadAllText(path);
-                DrugsConfig drugsConfig = JsonConvert.DeserializeObject<DrugsConfig>(jsonContent);
+                JobPoliceConfig drugsConfig = JsonConvert.DeserializeObject<JobPoliceConfig>(jsonContent);
 
                 return drugsConfig;
             }
@@ -121,7 +130,7 @@ namespace JobPolice
                     var query = await JobPoliceDrugs.Query(d => d.CharacterId == target.character.Id);
                     if (query != null && query.Count > 0)
                     {
-                        var isPositive = DateUtils.IsGreater(query[0].LastAlcohol, _drugsConfig.DurationOfAlcohol);
+                        var isPositive = DateUtils.IsGreater(query[0].LastAlcohol, _jobPoliceConfig.DurationOfAlcohol);
                         player.SendText($"{mk.Color("Contrôle d'alcoolémie:", mk.Colors.Info)} {target.GetFullName()} est {(isPositive ? mk.Color("NÉGATIF", mk.Colors.Success) : mk.Color("POSITIF", mk.Colors.Error))} à l'alcool");
                     } else player.SendText($"{mk.Color("Contrôle d'alcoolémie:", mk.Colors.Info)} {target.GetFullName()} est {mk.Color("NÉGATIF", mk.Colors.Success)} à l'alcool");
                 }
@@ -138,7 +147,7 @@ namespace JobPolice
                     var query = await JobPoliceDrugs.Query(d => d.CharacterId == target.character.Id);
                     if (query != null && query.Count > 0)
                     {
-                        var isPositive = DateUtils.IsGreater(query[0].LastCannabis, _drugsConfig.DurationOfCannabis);
+                        var isPositive = DateUtils.IsGreater(query[0].LastCannabis, _jobPoliceConfig.DurationOfCannabis);
                         player.SendText($"{mk.Color("Dépistage du THC:", mk.Colors.Info)} {target.GetFullName()} est {(isPositive ? mk.Color("NÉGATIF", mk.Colors.Success) : mk.Color("POSITIF", mk.Colors.Error))} au THC");
                     }
                     else player.SendText($"{mk.Color("Dépistage du THC:", mk.Colors.Info)} {target.GetFullName()} est {mk.Color("NÉGATIF", mk.Colors.Success)} au THC");
@@ -506,6 +515,7 @@ namespace JobPolice
                 {
                     fromPlayer.Notify("Verbalisation", $"Vous n'avez pas les moyens de payer {money}€ d'amende.", NotificationManager.Type.Error, 10);
                     toPlayer.Notify("Verbalisation", $"Le citoyen n'a pas les moyens de payer l'amende", NotificationManager.Type.Error);
+                    return await Task.FromResult(false);
                 }
 
                 if (!fromPlayer.character.PermisB)

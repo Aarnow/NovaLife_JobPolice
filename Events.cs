@@ -32,7 +32,7 @@ namespace JobPolice
             if (!player.setup.NetworkisDruged)
             {
                 player.setup.NetworkisDruged = true;
-                await Task.Delay(TimeSpan.FromSeconds(JobPolice._drugsConfig.DurationOfDruged));
+                await Task.Delay(TimeSpan.FromSeconds(JobPolice._jobPoliceConfig.DurationOfDruged));
                 player.setup.NetworkisDruged = false;
             }
         }
@@ -57,7 +57,7 @@ namespace JobPolice
             if (!player.setup.NetworkisDruged)
             {
                 player.setup.NetworkisDruged = true;
-                await Task.Delay(TimeSpan.FromSeconds(JobPolice._drugsConfig.DurationOfDruged));
+                await Task.Delay(TimeSpan.FromSeconds(JobPolice._jobPoliceConfig.DurationOfDruged));
                 player.setup.NetworkisDruged = false;
             }
         }

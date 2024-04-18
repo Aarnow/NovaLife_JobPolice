@@ -63,7 +63,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Classes\DrugsConfig.cs" />
+    <Compile Include="Classes\JobPoliceConfig.cs" />
     <Compile Include="Entities\JobPoliceCitizen.cs" />
     <Compile Include="Entities\JobPoliceDrugs.cs" />
     <Compile Include="Entities\JobPoliceOffense.cs" />

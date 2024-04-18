@@ -1,9 +1,10 @@
 ﻿namespace JobPolice.Classes
 {
-    public class DrugsConfig
+    public class JobPoliceConfig
     {
         public long DurationOfAlcohol;
         public long DurationOfCannabis;
         public long DurationOfDruged;
+        public int LawEnforcementBizId;
     }
 }

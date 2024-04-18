@@ -13,6 +13,7 @@ using ModKit.Utils;
 using static UnityEngine.GraphicsBuffer;
 using Steamworks.Ugc;
 using Life;
+using Life.DB;
 
 namespace JobPolice.Points
 {
@@ -266,24 +267,46 @@ namespace JobPolice.Points
             {
                 if (!jobPoliceRecord.IsPaid)
                 {
-                    jobPoliceRecord.IsPaid = true;
-                    if (await jobPoliceRecord.Save())
+                    Bizs lawEnforcementBiz = Nova.biz.FetchBiz(JobPolice._jobPoliceConfig.LawEnforcementBizId);
+                    if(lawEnforcementBiz != null)
                     {
-                        player.AddBankMoney(-money);
-                        player.character.PermisPoints -= points;
-                        if (player.character.PermisPoints <= 0)
+                        if (player.character.Bank >= money)
                         {
-                            player.character.PermisPoints = 0;
-                            player.character.PermisB = false;
+                            player.AddBankMoney(-money);
                         }
-                        player.SetPrisonTime(prisonTime);
-                        player.Notify("Sanction acceptée", "Vous venez d'accepter votre sort.", NotificationManager.Type.Success, 10);
+                        else if (player.character.Money >= money)
+                        {
+                            player.AddMoney(-money, "verbalisation");
+                        }
+                        else
+                        {
+                            player.Notify("Condamnation", $"Vous n'avez pas les moyens de payer {money}€ d'amende.", NotificationManager.Type.Error, 10);
+                            return await Task.FromResult(false);
+                        }
+                        lawEnforcementBiz.Bank += money;
+                        jobPoliceRecord.IsPaid = true;
 
-                        return await Task.FromResult(true);
-                    }
-                    else
+                        if (await jobPoliceRecord.Save())
+                        {
+                            player.character.PermisPoints -= points;
+                            if (player.character.PermisPoints <= 0)
+                            {
+                                player.character.PermisPoints = 0;
+                                player.character.PermisB = false;
+                            }
+                            player.SetPrisonTime(prisonTime);
+                            player.Notify("Sanction acceptée", "Vous venez d'accepter votre condamnation.", NotificationManager.Type.Success, 10);
+
+                            return await Task.FromResult(true);
+                        }
+                        else
+                        {
+                            player.Notify("Erreur", "Nous n'avons pas pu appliquer votre sanction.", NotificationManager.Type.Error);
+                            return await Task.FromResult(false);
+                        }
+                    } else
                     {
-                        player.Notify("Erreur", "Nous n'avons pas pu appliquer votre sanction.", NotificationManager.Type.Error);
+                        player.Notify("Erreur", "Nous n'avons pas pu exécuter votre requête", NotificationManager.Type.Error);
                         return await Task.FromResult(false);
                     }
                 }
