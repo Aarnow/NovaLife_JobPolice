@@ -14,6 +14,7 @@ using static UnityEngine.GraphicsBuffer;
 using Steamworks.Ugc;
 using Life;
 using Life.DB;
+using System.Collections;
 
 namespace JobPolice.Points
 {
@@ -165,7 +166,7 @@ namespace JobPolice.Points
         public async void JobPoliceCitizenSanctionPanel(Player player, JobPoliceCitizen citizen)
         {
             var sanctions = await JobPoliceRecord.Query(r => r.CitizenId == citizen.Id);
-            
+
             Panel panel = Context.PanelHelper.Create($"Casier judiciaire \"{citizen.Pseudonym}\"", UIPanel.PanelType.TabPrice, player, () => JobPoliceCitizenSanctionPanel(player, citizen));
 
             if (sanctions != null && sanctions.Count != 0)
@@ -325,12 +326,13 @@ namespace JobPolice.Points
         public async void JobPoliceSanctionPanel(Player player)
         {
             var citizens = await JobPoliceCitizen.QueryAll();
+            var queryTrie = citizens.OrderBy(item => item.Pseudonym).ToList();
 
             Panel panel = Context.PanelHelper.Create("Casiers judiciaire", UIPanel.PanelType.Tab, player, () => JobPoliceSanctionPanel(player));
 
-            if(citizens != null && citizens.Count > 0)
+            if(queryTrie != null && queryTrie.Count > 0)
             {
-                foreach(var citizen in citizens)
+                foreach(var citizen in queryTrie)
                 {
                     panel.AddTabLine($"{citizen.Pseudonym}", ui => JobPoliceCitizenSanctionPanel(player, citizen));
                 }
@@ -340,12 +342,12 @@ namespace JobPolice.Points
 
             panel.NextButton("Proximité", () =>
             {
-                if (citizens != null && citizens.Count > 0)
+                if (queryTrie != null && queryTrie.Count > 0)
                 {
                     var closestPlayer = player.GetClosestPlayer();
                     if (closestPlayer != null)
                     {
-                        var target = citizens.Where(c => c.CharacterId == closestPlayer.character.Id).FirstOrDefault();
+                        var target = queryTrie.Where(c => c.CharacterId == closestPlayer.character.Id).FirstOrDefault();
                         if (target != null && target != default)
                         {
                             JobPoliceCitizenSanctionPanel(player, target);

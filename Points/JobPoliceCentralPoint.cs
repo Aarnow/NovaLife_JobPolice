@@ -10,6 +10,7 @@ using System.Linq;
 using JobPolice.Entities;
 using ModKit.Utils;
 using Life;
+using System;
 public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>, PatternData
 {
     [AutoIncrement][PrimaryKey] public int Id { get; set; }
@@ -358,12 +359,13 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
     public async void JobPoliceCitizenWantedPanel(Player player)
     {
         var query = await JobPoliceCitizen.QueryAll();
+        var queryTrie = query.OrderBy(item => item.Pseudonym).ToList();
 
         Panel panel = Context.PanelHelper.Create("Citoyens enregistrés", UIPanel.PanelType.Tab, player, () => JobPoliceCitizenWantedPanel(player));
 
-        if (query != null && query.Count > 0)
+        if (queryTrie != null && queryTrie.Count > 0)
         {
-            foreach (var c in query)
+            foreach (var c in queryTrie)
             {
                 panel.AddTabLine($"{c.Pseudonym}", ui => JobPoliceShowCitizenWantedPanel(player, c.Id));
             }
@@ -434,22 +436,14 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
         panel.NextButton("Sélectionner", () => panel.SelectTab());
         panel.PreviousButtonWithAction("Supprimer", async () =>
         {
-            if(player.biz.OwnerId == player.character.Id)
+            if (await citizen.Delete())
             {
-                if (await citizen.Delete())
-                {
-                    player.Notify("Succès", "Ce citoyen n'est plus référencé", NotificationManager.Type.Success);
-                    return true;
-                }
-                else
-                {
-                    player.Notify("Erreur", "Nous n'avons pas pu retirer ce citoyen", NotificationManager.Type.Error);
-                    return false;
-                }
+                player.Notify("Succès", "Ce citoyen n'est plus référencé", NotificationManager.Type.Success);
+                return true;
             }
             else
             {
-                player.Notify("Erreur", "Vous n'avez pas l'autorisation de détruire ce document", NotificationManager.Type.Error);
+                player.Notify("Erreur", "Nous n'avons pas pu retirer ce citoyen", NotificationManager.Type.Error);
                 return false;
             }
         });
@@ -485,14 +479,35 @@ public class JobPoliceCentralPoint : ModKit.ORM.ModEntity<JobPoliceCentralPoint>
     public async void JobPoliceCitizenRecordDetailsPanel(Player player, JobPoliceRecord jobPoliceRecord)
     {
         var offenses = await JobPoliceOffense.QueryAll();
+        jobPoliceRecord.LOffenseList = ListConverter.ReadJson(jobPoliceRecord.OffenseList);
+        var prisonTime = 0;
+        var money = 0.0;
+        var points = 0;
 
         Panel panel = Context.PanelHelper.Create($"Casier judiciaire n°{jobPoliceRecord.Id}", UIPanel.PanelType.TabPrice, player, () => JobPoliceCitizenRecordDetailsPanel(player, jobPoliceRecord));
 
-        foreach (var offenseId in jobPoliceRecord.LOffenseList)
+        if (offenses != null && offenses.Count != 0)
         {
-            var currentOffense = offenses.Where(o => o.Id == offenseId).FirstOrDefault();
-            if (currentOffense != null) panel.AddTabLine($"{currentOffense.Title}", $"{currentOffense.OffenseType}", 0, _ => { });
+            if (jobPoliceRecord.LOffenseList != null && jobPoliceRecord.LOffenseList.Count != 0)
+            {
+                foreach (var offenseId in jobPoliceRecord.LOffenseList)
+                {
+                    var currentOffense = offenses.Where(o => o.Id == offenseId).FirstOrDefault();
+                    if (currentOffense != null)
+                    {
+                        prisonTime += currentOffense.PrisonTime;
+                        money += currentOffense.Money;
+                        points += currentOffense.Points;
+                        panel.AddTabLine($"{currentOffense.Title}", $"{currentOffense.OffenseType}", ItemUtils.GetIconIdByItemId(currentOffense.OffenseTag[currentOffense.OffenseType]), _ => { });
+                    }
+                }
+                panel.AddTabLine($"{mk.Color("Temps de prison", mk.Colors.Info)}", $"{prisonTime} secondes", -1, _ => { });
+                panel.AddTabLine($"{mk.Color("Montant de l'amende", mk.Colors.Info)}", $"{money}€", -1, _ => { });
+                panel.AddTabLine($"{mk.Color("Retrait points de permis B", mk.Colors.Info)}", $"{points} points", -1, _ => { });
+            }
+            else player.Notify("Erreur", "Nous n'avons pas pu récupérer les offenses", Life.NotificationManager.Type.Error);
         }
+        else player.Notify("Erreur", "Nous n'avons pas pu récupérer les infractions", Life.NotificationManager.Type.Error);
 
         panel.PreviousButton();
         panel.CloseButton();
